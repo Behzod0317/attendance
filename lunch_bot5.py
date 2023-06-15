@@ -52,7 +52,6 @@ dispatcher.add_handler(help_handler)
 # Dictionary to store attendance information
 attendance_data = {}
 
-
 def collect_attendance(update: Update, context):
     message_text = update.message.text.strip()
     user = update.message.from_user
@@ -62,52 +61,54 @@ def collect_attendance(update: Update, context):
 
     if message_text == '+':
         if user.id not in attendance_data:
-            attendance_data[user.id] = {
-                'name': user.first_name, 'coming_time': current_time}
+            attendance_data[user.id] = {'name': user.first_name, 'coming_time': current_time}
+        elif 'coming_time' in attendance_data[user.id] and 'to_lunch' not in attendance_data[user.id]:
+            if 'from_lunch' not in attendance_data[user.id] and 'leaving_time' not in attendance_data[user.id]:
+                if '07:00:00' <= current_time <= '11:30:00':
+                    attendance_data[user.id]['to_lunch'] = current_time
     elif message_text == '-':
         if user.id in attendance_data:
-            attendance_data[user.id]['leaving_time'] = current_time
-
-
-# Register the message handler to collect attendance
-message_handler = MessageHandler(
-    Filters.text & ~Filters.command, collect_attendance)
-dispatcher.add_handler(message_handler)
-
-
+            if 'to_lunch' in attendance_data[user.id] and 'from_lunch' not in attendance_data[user.id]:
+                if '13:00:00' <= current_time <= '15:00:00':
+                    attendance_data[user.id]['from_lunch'] = current_time
+            elif 'from_lunch' in attendance_data[user.id] and 'leaving_time' not in attendance_data[user.id]:
+                if '15:00:00' <= current_time <= '23:50:00':
+                    attendance_data[user.id]['leaving_time'] = current_time
 def generate_attendance_table(update: Update, context):
     pdf = UnicodePDF()
-    pdf.add_page() 
-    #pdf.set_font('Arial', 'B', 15)
-   
+    pdf.add_page()
     font_path = os.path.join(os.path.dirname(__file__), 'dejavu-sans-ttf-2.37', 'DejaVuSans.ttf')
     pdf.add_font('DejaVuSans', '', font_path, uni=True)
     pdf.set_font('DejaVuSans', '', 15)
 
     pdf.cell(15, 15, 'ID')
-    pdf.cell(50, 15, 'User')    
+    pdf.cell(50, 15, 'User')
     pdf.cell(50, 15, 'Date')
     pdf.cell(50, 15, 'Coming Time')
+    pdf.cell(50, 15, 'To Lunch')
+    pdf.cell(50, 15, 'From Lunch')
     pdf.cell(50, 15, 'Leaving Time')
     pdf.ln()
 
     now = datetime.now()
     current_date = now.strftime("%Y-%m-%d")  # Define current_date here
 
-    id_counter = 1 
+    id_counter = 1
     for user_id, data in attendance_data.items():
         user_name = data.get('name', '')
         coming_time = data.get('coming_time', '')
+        to_lunch = data.get('to_lunch', '')
+        from_lunch = data.get('from_lunch', '')
         leaving_time = data.get('leaving_time', '')
 
-        # user_name = unicodedata.normalize('NFKD', user_name).encode(
-        #     'ascii', 'ignore').decode('utf-8')
         user_name = str(user_name)
 
-        pdf.cell(15, 15, str(id_counter)) 
+        pdf.cell(15, 15, str(id_counter))
         pdf.cell(50, 15, user_name or '')
         pdf.cell(50, 15, current_date)
         pdf.cell(50, 15, coming_time or '')
+        pdf.cell(50, 15, to_lunch or '')
+        pdf.cell(50, 15, from_lunch or '')
         pdf.cell(50, 15, leaving_time or '')
         pdf.ln()
         id_counter += 1
@@ -115,7 +116,6 @@ def generate_attendance_table(update: Update, context):
     pdf_file = 'Attendance.pdf'
     pdf.output(pdf_file)
 
-    # Send the PDF file to the user who requested it
     with open(pdf_file, 'rb') as file:
         context.bot.send_document(
             chat_id=update.effective_chat.id, document=file, caption='Davomod hisoboti')
