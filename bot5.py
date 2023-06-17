@@ -11,7 +11,6 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 
 # Telegram bot token (replace 'YOUR_BOT_TOKEN' with your bot token)
 TOKEN = '6082028232:AAG0tngUrjsf7HvPO_HOFddVr2Uiw2o5J8s'
-
 # Create an instance of the Updater class
 updater = Updater(token=TOKEN, use_context=True)
 dispatcher = updater.dispatcher
@@ -57,7 +56,7 @@ def collect_attendance(update: Update, context):
     message_text = update.message.text.strip()
     user = update.message.from_user
     now = datetime.now()
-    current_time = now.strftime("%H:%M:%S")
+    current_time = now.strftime("%H:%M")
     current_date = now.strftime("%Y-%m-%d")
 
     if message_text == '+':

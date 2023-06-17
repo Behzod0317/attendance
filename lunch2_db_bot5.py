@@ -36,11 +36,11 @@ connection = psycopg2.connect(
 
 class UnicodePDF(FPDF):
     def header(self):
-        # Add a custom header if needed
+        
         pass
 
     def footer(self):
-        # Add a custom footer if needed
+        
         pass
 
 
@@ -89,7 +89,6 @@ cursor = connection.cursor()
 #             attendance_data[user.id]['leaving_time'] = current_time
 
 
-
 def collect_attendance(update: Update, context):
     message_text = update.message.text.strip()
     user = update.message.from_user
@@ -99,7 +98,8 @@ def collect_attendance(update: Update, context):
 
     if message_text == '+':
         if user.id not in attendance_data:
-            attendance_data[user.id] = {'name': user.first_name, 'coming_time': current_time}
+            attendance_data[user.id] = {
+                'name': user.first_name, 'coming_time': current_time}
         elif 'coming_time' in attendance_data[user.id] and 'to_lunch' not in attendance_data[user.id]:
             attendance_data[user.id]['to_lunch'] = current_time
         elif 'coming_time' in attendance_data[user.id] and 'to_lunch' in attendance_data[user.id] and 'from_lunch' not in attendance_data[user.id]:
@@ -114,7 +114,6 @@ def collect_attendance(update: Update, context):
                 attendance_data[user.id]['from_lunch'] = current_time
             elif 'from_lunch' in attendance_data[user.id] and 'leaving_time' not in attendance_data[user.id]:
                 attendance_data[user.id]['leaving_time'] = current_time
-
 
 
 message_handler = MessageHandler(
@@ -182,6 +181,8 @@ dispatcher.add_handler(message_handler)
 
 #     # Send a message to notify the user
 #     context.bot.send_message(chat_id=update.effective_chat.id, text='Attendance data inserted into the database and PDF sent')
+
+
 def generate_attendance_table(update: Update, context):
     now = datetime.now()
     current_date = now.strftime("%Y-%m-%d")
@@ -189,7 +190,8 @@ def generate_attendance_table(update: Update, context):
     # Initialize PDF object and set up the page
     pdf = UnicodePDF()
     pdf.add_page()
-    font_path = os.path.join(os.path.dirname(__file__), 'dejavu-sans-ttf-2.37', 'DejaVuSans.ttf')
+    font_path = os.path.join(os.path.dirname(
+        __file__), 'dejavu-sans-ttf-2.37', 'DejaVuSans.ttf')
     pdf.add_font('DejaVuSans', '', font_path, uni=True)
     pdf.set_font('DejaVuSans', '', 12)
 
@@ -202,53 +204,53 @@ def generate_attendance_table(update: Update, context):
     pdf.cell(30, 15, 'Left')
     pdf.ln()
 
-    cursor = connection.cursor()  # Open a new cursor
+    # Open a new cursor
+    with connection.cursor() as cursor:
+        for id_counter, (user_id, data) in enumerate(attendance_data.items(), start=1):
+            user_name = data.get('name', '')
+            coming_time = data.get('coming_time', '')
+            to_lunch = data.get('to_lunch', '')
+            from_lunch = data.get('from_lunch', '')
+            leaving_time = data.get('leaving_time', '')
 
-    for id_counter, (user_id, data) in enumerate(attendance_data.items(), start=1):
-        user_name = data.get('name', '')
-        coming_time = data.get('coming_time', '')
-        to_lunch = data.get('to_lunch', '')
-        from_lunch = data.get('from_lunch', '')
-        leaving_time = data.get('leaving_time', '')
+            insert_query = '''
+            INSERT INTO attendance (name, date, coming_time, to_lunch, from_lunch, leaving_time)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            '''
+            cursor.execute(insert_query, (user_name, current_date,
+                           coming_time, to_lunch, from_lunch, leaving_time))
 
-        insert_query = '''
-        INSERT INTO attendance (name, date, coming_time, to_lunch, from_lunch, leaving_time)
-        VALUES (%s, %s, %s, %s, %s, %s)
-        '''
-        cursor.execute(insert_query, (user_name, current_date, coming_time, to_lunch, from_lunch, leaving_time))
+            # Add data to the PDF
+            pdf.cell(15, 15, str(id_counter))
+            pdf.cell(30, 15, str(user_name))
+            pdf.cell(40, 15, str(current_date))
+            pdf.cell(30, 15, str(coming_time))
+            pdf.cell(30, 15, str(to_lunch))
+            pdf.cell(30, 15, str(from_lunch)
+                     if to_lunch and from_lunch != '' else '')
+            pdf.cell(30, 15, str(leaving_time)
+                     if to_lunch and from_lunch and leaving_time != '' else '')
+            pdf.ln()
 
-        # Add data to the PDF
-        pdf.cell(15, 15, str(id_counter))
-        pdf.cell(30, 15, str(user_name))
-        pdf.cell(40, 15, str(current_date))
-        pdf.cell(30, 15, str(coming_time))
-        pdf.cell(30, 15, str(to_lunch))
-        pdf.cell(30, 15, str(from_lunch) if to_lunch and from_lunch != '' else '')
-        pdf.cell(30, 15, str(leaving_time) if to_lunch and from_lunch and leaving_time != '' else '')
-        pdf.ln()
+        # Commit the database changes
+        connection.commit()
 
-    # Commit the database changes
-    connection.commit()
-
-    # Save the PDF file
+    
     pdf_file = 'Attendance.pdf'
     pdf.output(pdf_file)
 
-    # Send the PDF file to the user
+   
     with open(pdf_file, 'rb') as file:
-        context.bot.send_document(chat_id=update.effective_chat.id, document=file, caption='Davomod hisoboti')
+        context.bot.send_document(
+            chat_id=update.effective_chat.id, document=file, caption='Davomod hisoboti')
 
-    # Remove the PDF file
+   
     os.remove(pdf_file)
 
-    # Close the cursor
-    cursor.close()
+    
+    # context.bot.send_message(chat_id=update.effective_chat.id,
+    #                          text='data inserted to database')
 
-    # Close the connection
-    connection.close()
-
-    # Send a message to notify the user
-    context.bot.send_message(chat_id=update.effective_chat.id, text='Attendance data inserted into the database and PDF sent')
 
 hisob_handler = CommandHandler('hisob', generate_attendance_table)
 dispatcher.add_handler(hisob_handler)
@@ -256,11 +258,11 @@ dispatcher.add_handler(hisob_handler)
 
 def show_menu(update: Update, context):
     menu_options = [
-        ['/start', '/menu'],  # List of available commands/options
-        ['/help'],  # to give information
-        ['+'],  # Attend
-        ['-'],  # Leave
-        ['/hisob'],  # Generate attendance table
+        ['/start', '/menu'],
+        ['/help'],
+        ['+'],
+        ['-'],
+        ['/hisob'],
     ]
     reply_markup = ReplyKeyboardMarkup(menu_options, resize_keyboard=True)
     context.bot.send_message(chat_id=update.effective_chat.id,
